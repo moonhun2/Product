@@ -71,6 +71,9 @@ IPAddress secondaryDNS(219,250,36,130); //optional
 #error "Camera model not selected"
 #endif
 
+// use configuration
+extern Preferences preferences; // APSetting.h에 선언된 객체 사용
+
 // GPIO Setting
 
 extern String WiFiAddr ="";
@@ -168,6 +171,21 @@ void setup() {
   Serial.println("' to connect");
 }
 
+
+unsigned long ulTimeReset = millis(); // 네트웍이 끊어지는 문제로 30분마다 리셋
+#define TIME_RESET  1800000           // 1000 * 60 * 30 // 30분 
+//#define TIME_RESET  30000           // 1000 * 60 * 60
+
 void loop() {
+  delay(1000);
+
+  unsigned long ulTimeCur = millis();
+  if( (millis() - ulTimeReset) > TIME_RESET)
+  {
+    ulTimeReset = millis(); // 타이머 초기화
+    preferences.putString("pref_reset", "SW_Reset");  // SW 리셋이 진행중임을 기록
+    Serial.println("\n\n restart ESP \n\n");
+    ESP.restart();
+  }
   
 }

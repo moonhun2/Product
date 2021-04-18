@@ -251,6 +251,18 @@ void APS_wait_for_BLE()
   {
     handler_Alarm(PERIOD_ALARM_BLE);  // blink the BUILT-IN-RED
 
+    String strIsReset = preferences.getString("pref_reset");
+    if(strIsReset == "SW_Reset")  // SW Reset이 진행중이면 본 함수를 pass. 단, wifi가 접속되어 있을 경우만....
+    {
+      preferences.putString("pref_reset", "SW_Done");  // 리셋이 끝났음을 기록
+      
+      if( bWiFi_connected)
+      {
+        Serial.println("In progress SW_Reset. so pass this APS_wait_for_BLE");
+        return;
+      }
+    }
+
     if(wifi_state == NONE)  // BLE를 통한 WIFI 설정 흐름이 진행되지 않음
     {
       if( bWiFi_connected &&                          // WIFI 접속이 유효해도

@@ -2,8 +2,8 @@
 // ADC2
 #include "esp32-hal-adc.h" // needed for adc pin reset
 #include "soc/sens_reg.h" // needed for adc pin reset
-uint64_t reg_b; // Used to store Pin registers  before WIFI
-uint64_t reg_f; // Used to store Pin registers  after WIFI
+uint64_t reg_b1, reg_b2, reg_b3; // Used to store Pin registers  before WIFI
+uint64_t reg_f1, reg_f2, reg_f3; // Used to store Pin registers  after WIFI
 
 #include <Preferences.h>
 extern Preferences preferences; // APSetting.h에 선언된 객체 사용
@@ -24,14 +24,31 @@ int nMoistRate = 50;  // 수분 설정 비율(%)
 /* 서보관련 초기화  */
 void MC_Init() {
 
-  // Save Pin Registers : Do this before begin Wifi
-  reg_b = READ_PERI_REG(SENS_SAR_READ_CTRL2_REG);
-  
   pinMode(PIN_SOL_VALVE, OUTPUT);
 
 //  Fill_pump();
   
 }
+
+void MC_SaveRegister(bool bWiFiUsing) {
+
+  if(bWiFiUsing)  // wifi를 사용중인 상태
+  {
+    // Save Pin Registers : Do this before begin Wifi
+    reg_f1 = READ_PERI_REG(SENS_SAR_START_FORCE_REG);
+    reg_f2 = READ_PERI_REG(SENS_SAR_READ_CTRL2_REG);
+    reg_f3 = READ_PERI_REG(SENS_SAR_MEAS_START2_REG);
+  }
+  else
+  {
+    // Save Pin Registers : Do this before begin Wifi
+    reg_b1 = READ_PERI_REG(SENS_SAR_START_FORCE_REG);
+    reg_b2 = READ_PERI_REG(SENS_SAR_READ_CTRL2_REG);
+    reg_b3 = READ_PERI_REG(SENS_SAR_MEAS_START2_REG);
+  }
+  
+}
+
 
 void MC_TrimMoisture(int nValue)  // 퍼센트
 {
@@ -71,15 +88,17 @@ int nSoilRate = 0;
 
 void MC_Watered() {
 
-  // Save Pin Registers : Do this before begin Wifi
-  reg_f = READ_PERI_REG(SENS_SAR_READ_CTRL2_REG);
-  
-  // ADC Pin Reset: Do this before every analogRead()
-  WRITE_PERI_REG(SENS_SAR_READ_CTRL2_REG, reg_b);
+  // Set the register-state that is not use wifi
+//  WRITE_PERI_REG(SENS_SAR_START_FORCE_REG, reg_b1);  // Change to the state of None-Wifi
+  WRITE_PERI_REG(SENS_SAR_READ_CTRL2_REG, reg_b2);
+//  WRITE_PERI_REG(SENS_SAR_MEAS_START2_REG, reg_b3);
 
   nSoilWater = analogRead(PIN_MOIST_SENSOR);  // 물이 없을때 4095 / 물이 많을때 2100정도가 나옴
 
-  WRITE_PERI_REG(SENS_SAR_READ_CTRL2_REG, reg_f);
+  // Set the register-state that is using wifi
+//  WRITE_PERI_REG(SENS_SAR_START_FORCE_REG, reg_f1);  // Change to the state of Wifi
+//  WRITE_PERI_REG(SENS_SAR_READ_CTRL2_REG, reg_f2);
+//  WRITE_PERI_REG(SENS_SAR_MEAS_START2_REG, reg_f3);
   
   //nSoilRate = nSoilWater / VALUE_MOISTSENSOR_WET * 100;  // 센서의 최대값 대비 몇퍼센트인지  
   nSoilRate = map(nSoilWater, VALUE_MOISTSENSOR_WET, VALUE_MOISTSENSOR_DRY, 100, 0);  // 센서의 최대값 대비 몇퍼센트인지  
@@ -96,6 +115,9 @@ void MC_Watered() {
 
   if(bPrevValve != bValveOpen)  // 밸브 상태가 변하면 디버깅 정보 출력
   {
+    String strInfo = String(nSoilWater) + " / " + String(nSoilRate) + " / " + String(nMoistRate) + " : ";
+    Serial.print(strInfo);
+    
     if(bValveOpen) // 흙이 건조함
     {
         Serial.println("Valve opened");
@@ -109,5 +131,5 @@ void MC_Watered() {
   }
       
   bPrevValve = bValveOpen;
-  delay(1000);
+  //delay(1000);
 }

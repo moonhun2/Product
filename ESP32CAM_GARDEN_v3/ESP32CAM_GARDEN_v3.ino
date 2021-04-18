@@ -71,6 +71,9 @@ IPAddress secondaryDNS(219,250,36,130); //optional
 #error "Camera model not selected"
 #endif
 
+// use configuration
+extern Preferences preferences; // APSetting.h에 선언된 객체 사용
+
 // GPIO Setting
 
 extern String WiFiAddr ="";
@@ -78,6 +81,7 @@ extern String WiFiAddr ="";
 void startCameraServer();
 
 void MC_Init();
+void MC_SaveRegister(bool bWiFiUsing);
 void MC_Watered();
 
 void setup() {
@@ -85,6 +89,7 @@ void setup() {
   Serial.begin(115200);
 
   MC_Init();    // motion control 초기화
+  MC_SaveRegister(false);
   
   Serial.setDebugOutput(true);
   Serial.println();
@@ -135,26 +140,7 @@ void setup() {
   //drop down frame size for higher initial frame rate
   sensor_t * s = esp_camera_sensor_get();
   s->set_framesize(s, FRAMESIZE_CIF);
-/*
-  if(!WiFi.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS)) {
-      Serial.println("STA Failed to configure");
-  }
-  */ 
-  /*WiFi.begin(ssid, password);
 
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("");
-  Serial.println("WiFi connected");
-
-  
-  Serial.print("Camera Ready! Use 'http://");
-  Serial.print(WiFi.localIP());
-  WiFiAddr = WiFi.localIP().toString();
-  Serial.println("' to connect");
-*/
   Serial.println("Get into APS_init()");
   APS_init();   // AP setting 초기화
 
@@ -169,9 +155,31 @@ void setup() {
   Serial.print(WiFi.localIP());
   WiFiAddr = WiFi.localIP().toString();
   Serial.println("' to connect");
+
+  MC_SaveRegister(true);
 }
 
+unsigned long ulTimeReset = millis(); // 네트웍이 끊어지는 문제로 30분마다 리셋
+unsigned long ulTimeGetInfo = millis(); // 네트웍이 끊어지는 문제로 30분마다 리셋
+
+#define TIME_GET_WATER 1000
+#define TIME_RESET  1800000           // 1000 * 60 * 30
+//#define TIME_RESET  30000           // 1000 * 60 * 60
+
 void loop() {
-  MC_Watered();
-  delay(1000);
+  
+  
+  if( (millis() - ulTimeReset) > TIME_RESET)
+  {
+    ulTimeReset = millis(); // 타이머 초기화
+    preferences.putString("pref_reset", "SW_Reset");  // SW 리셋이 진행중임을 기록
+    Serial.println("\n\n restart ESP \n\n");
+    ESP.restart();
+  }
+
+  if( (millis() - ulTimeGetInfo) > TIME_GET_WATER)
+  {
+    ulTimeGetInfo = millis(); // 타이머 초기화
+    MC_Watered();
+  }
 }

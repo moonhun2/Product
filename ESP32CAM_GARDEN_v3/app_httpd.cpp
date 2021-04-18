@@ -180,6 +180,8 @@ static esp_err_t stream_handler(httpd_req_t *req){
           size_t hlen = snprintf((char *)part_buf, 64, _STREAM_PART, _jpg_buf_len);
           res = httpd_resp_send_chunk(req, (const char *)part_buf, hlen);
 
+          delay(5);
+          
           if(res != ESP_OK)
             strError = "Err to send Header " + String(hlen);
       }
@@ -188,6 +190,8 @@ static esp_err_t stream_handler(httpd_req_t *req){
       if(res == ESP_OK)
       {
           res = httpd_resp_send_chunk(req, (const char *)_jpg_buf, _jpg_buf_len);
+
+          delay(5);
 
           if(res == ESP_ERR_INVALID_ARG)
             strError = "ESP_ERR_INVALID_ARG " + String(_jpg_buf_len);
@@ -203,6 +207,9 @@ static esp_err_t stream_handler(httpd_req_t *req){
       if(res == ESP_OK)
       {
           res = httpd_resp_send_chunk(req, _STREAM_BOUNDARY, strlen(_STREAM_BOUNDARY));
+
+          delay(5);
+          
           if(res != ESP_OK)
             strError = "Err to send boundry ";
       }
@@ -234,8 +241,6 @@ static esp_err_t stream_handler(httpd_req_t *req){
           (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time,
           avg_frame_time, (float)nFPS
       );
-
-      
       
   }
 
@@ -357,94 +362,12 @@ static esp_err_t status_handler(httpd_req_t *req){
     return httpd_resp_send(req, json_response, strlen(json_response));
 }
 
+// setInterval(          function(){  getInform();  }   , 1000        );  // 주기적 호출을 일단 뺀다.
+        
 static esp_err_t index_handler(httpd_req_t *req){
   httpd_resp_set_type(req, "text/html");
 
   String page;
-/*  page += "<html>\n";
-  page += "<head>\n";
-  page += "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0\">\n";
-  page += "<script>var xhttp = new XMLHttpRequest();</script>\n\n";
-  
-  page += "<script>function getsend(arg) { xhttp.open('GET', arg +'?' + new Date().getTime(), true); xhttp.send(); }\n";
-  
-  page += "setInterval(function() {    getData();  }, 1000); \n";
-  page += "function getData() {    xhttp.onreadystatechange = function() {      if (this.readyState == 4 && this.status == 200) {        document.getElementById(\"ADCValue\").innerHTML =        this.responseText;      }    };    xhttp.open(\"GET\", \"readADC\", true);    xhttp.send();  }\n";
-  page += "</script>\n\n";
-
-  page += "<script>\n";
-
-  page += "document.addEventListener('DOMContentLoaded', function (event) {\n";
-  page += "var baseHost = document.location.origin;\n";
-  page += "var streamUrl = baseHost + ':81';\n\n";
-
-  page += "const view = document.getElementById('stream');\n";
-  page += "const viewContainer = document.getElementById('stream-container');\n";
-  page += "const streamButton = document.getElementById('toggle-stream');\n";
-  page += "const captureButton = document.getElementById('capture-image');\n";
-  
-  page += "function stopStream() {\n";
-  page += "  streamButton.innerHTML = 'Start Stream';\n";
-  page += "  view.src = ``;\n";
-  page += "  window.stop();\n";
-  page += "}\n\n";
-
-  page += "function startStream() {\n";
-  page += "  streamButton.innerHTML = 'Stop Stream';\n";
-  page += "  view.src = `${streamUrl}/stream`;\n";
-//  page += "  document.getElementById('StrUri').innerHTML = `${streamUrl}/stream`;\n";
-  page += "  show(viewContainer);\n";
-  page += "}\n\n";
-
-  page += "streamButton.onclick = function() {\n";
-  //page += "  const streamEnabled = streamButton.innerHTML === 'Stop Stream';\n";
-  //page += "  if (streamEnabled) {\n";
-  page += "  if (streamButton.innerHTML == 'Stop Stream') {\n";
-  page += "    stopStream();\n";
-  page += "  } else {\n";
-  page += "    startStream();\n";
-  page += "  }\n";
-  page += "}\n\n";
-
-  page += "})\n";
-  
-  page += "</script>\n";
-
-  page += "<style>\n";
-  page += "figure {text-align:center;}\n";
-  page += "</style>\n";
-  
-  page += "</head>\n";
-
-  page += "<body>\n";
-
-  page += "<p align=center>\n";
-  page += "      <div id='stream-container' style='text-align: center;' class='image-container hidden'>\n";
-  page += "          <img id='stream' src=''>\n";
-  page += "      </div>\n";
-  page += "</p>\n";
-  
-  page += "<p align=center>";
-  page += "<button id='capture-image' style=width:140px;height:40px;>Capture Image</button>\n";
-  page += "<button id='toggle-stream' style=width:140px;height:40px;>Start Stream</button>\n";
-//  page += "Stream uri : <span id=\"StrUri\">0</span><br>\n";
-  page += "</p>";
-  
-  page += "<p align=center>\n";
-  page += "<button style=width:140px;height:40px onmousedown=getsend('LON')><b>LIGHT ON</b></button>\n";
-  page += "<button style=width:140px;height:40px onmousedown=getsend('LOFF')><b>LIGHT OFF</b></button>\n";
-  page += "</p>\n\n";
-  
-  page += "<p align=center>\n";
-  page += "<button style=width:140px;height:40px onmousedown=getsend('TL')><b>Trim Left</b></button>\n";
-  page += "<button style=width:140px;height:40px onmousedown=getsend('TR')><b>Trim Right</b></button>\n";
-  page += "</p>\n\n";
-  
-  page += "Moisture : <span id=\"ADCValue\">0</span><br>\n";
-
-  page += "</body>\n";
-  
-  page += "</html>\n"; */
 
   page = R"(
   
@@ -454,28 +377,26 @@ static esp_err_t index_handler(httpd_req_t *req){
       
       <script>
         var xhttp = new XMLHttpRequest();
-      </script>
-      
-      <script>
+
         function getsend(arg) { 
           xhttp.open('GET', arg +'?' + new Date().getTime(), true); 
           xhttp.send(); 
         }
+
         
-        setInterval(          function(){  getData();  }   , 1000        ); 
           
-        function getData() {    
+        function getInform() {    
           xhttp.onreadystatechange = function() {      
-            if (this.readyState == 4 && this.status == 200) {        
-              document.getElementById(\"ADCValue\").innerHTML =        this.responseText;      
+            if (this.readyState == 4 && this.status == 200) {  
+              if(this.responseText != "OK")
+                document.getElementById("ADCValue").innerHTML =        this.responseText;      
             }    
           };    
           
-          xhttp.open(\"GET\", \"readADC\", true);    xhttp.send();  
+          xhttp.open("GET", "readADC", true);    xhttp.send();  
         }
-      </script>
-    
-      <script>
+
+      
         document.addEventListener('DOMContentLoaded', function (event) {
           var baseHost = document.location.origin;
           var streamUrl = baseHost + ':81';
@@ -537,8 +458,10 @@ static esp_err_t index_handler(httpd_req_t *req){
         <button style=width:140px;height:40px; onmousedown=getsend('TL')><b>Trim Left</b></button>
         <button style=width:140px;height:40px; onmousedown=getsend('TR')><b>Trim Right</b></button>
       </p>
-      
-      Moisture : <span id=\"ADCValue\">0</span><br>
+
+      <br>
+      <button id='get_inform' style=width:140px;height:40px; onmousedown=getInform()>Information</button><br>
+      Moisture : <span id="ADCValue">0</span><br>
     
     </body>
   
@@ -571,15 +494,17 @@ static esp_err_t TR_handler(httpd_req_t *req)
 
 static esp_err_t readADC_handler(httpd_req_t *req)
 {   
-  String strInfo = /*String(nSoilWater) + "/" + */String(nSoilRate) + "/" + String(nMoistRate) + " <br>Valve : " + String(bValveOpen) + "<br> FPS : "  + String(nFPS) + "<br> State : "  + strError;
-  char* tempArr;
+  String strInfo = String(nSoilWater) + "/" + String(nSoilRate) + "/" + String(nMoistRate) + " <br>Valve : " + String(bValveOpen) + "<br> FPS : "  + String(nFPS) + "<br> State : "  + strError;
+  /*char* tempArr;
   int nLength = strInfo.length()+1;
   tempArr = new char[nLength];
   strInfo.toCharArray(tempArr, nLength);
   //Serial.println("readADC_handler");    
   httpd_resp_set_type(req, "text/html");    return httpd_resp_send(req, tempArr, nLength);   
 
-  delete [] tempArr;
+  delete [] tempArr;*/
+
+  httpd_resp_set_type(req, "text/html");    return httpd_resp_send(req, &strInfo[0], strlen(&strInfo[0]));
 }
 
 /*
