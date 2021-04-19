@@ -104,10 +104,7 @@ void MC_Watered() {
   nSoilRate = map(nSoilWater, VALUE_MOISTSENSOR_WET, VALUE_MOISTSENSOR_DRY, 100, 0);  // 센서의 최대값 대비 몇퍼센트인지  
 
   bValveOpen = ((nSoilRate < nMoistRate) ? true : false);
-/*
-  Serial.print("nMoistRate : ");
-  Serial.println(nMoistRate);
-*/
+
   if(bValveOpen) // 흙이 건조함
       digitalWrite(PIN_SOL_VALVE, LOW);
   else

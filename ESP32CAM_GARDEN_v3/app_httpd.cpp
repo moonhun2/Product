@@ -236,10 +236,11 @@ static esp_err_t stream_handler(httpd_req_t *req){
       uint32_t avg_frame_time = ra_filter_run(&ra_filter, frame_time);
       nFPS = 1000.0 / avg_frame_time;
 
-      Serial.printf("MJPG: %uB %ums (%.1ffps), AVG: %ums (%.1ffps)\n"
+      Serial.printf("MJPG: %uB %ums (%.1ffps), AVG: %ums (%.1ffps) : %d\n"
           ,(uint32_t)(_jpg_buf_len),
           (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time,
-          avg_frame_time, (float)nFPS
+          avg_frame_time, (float)nFPS,
+          _jpg_buf
       );
       
   }
@@ -396,7 +397,11 @@ static esp_err_t index_handler(httpd_req_t *req){
           xhttp.open("GET", "readADC", true);    xhttp.send();  
         }
 
-      
+        window.addEventListener('beforeunload', function (event) {
+          stopStream();
+        });
+
+
         document.addEventListener('DOMContentLoaded', function (event) {
           var baseHost = document.location.origin;
           var streamUrl = baseHost + ':81';
@@ -462,7 +467,7 @@ static esp_err_t index_handler(httpd_req_t *req){
       <br>
       <button id='get_inform' style=width:140px;height:40px; onmousedown=getInform()>Information</button><br>
       Moisture : <span id="ADCValue">0</span><br>
-    
+      <button style=width:140px;height:40px; onmousedown=getsend('ResetCam')><b>ResetCam</b></button>
     </body>
   
   </html>
@@ -495,16 +500,14 @@ static esp_err_t TR_handler(httpd_req_t *req)
 static esp_err_t readADC_handler(httpd_req_t *req)
 {   
   String strInfo = String(nSoilWater) + "/" + String(nSoilRate) + "/" + String(nMoistRate) + " <br>Valve : " + String(bValveOpen) + "<br> FPS : "  + String(nFPS) + "<br> State : "  + strError;
-  /*char* tempArr;
-  int nLength = strInfo.length()+1;
-  tempArr = new char[nLength];
-  strInfo.toCharArray(tempArr, nLength);
-  //Serial.println("readADC_handler");    
-  httpd_resp_set_type(req, "text/html");    return httpd_resp_send(req, tempArr, nLength);   
-
-  delete [] tempArr;*/
-
   httpd_resp_set_type(req, "text/html");    return httpd_resp_send(req, &strInfo[0], strlen(&strInfo[0]));
+}
+
+static esp_err_t ResetCam_handler(httpd_req_t *req)
+{
+  preferences.putString("pref_reset", "SW_Reset");  // SW 리셋이 진행중임을 기록
+  ESP.restart();
+  Serial.println("ResetCam");    httpd_resp_set_type(req, "text/html");    return httpd_resp_send(req, "ResetCam...", 11);  
 }
 
 /*
@@ -576,6 +579,13 @@ void startCameraServer(){
         .user_ctx  = NULL
     };
 
+    httpd_uri_t ResetCam_uri = {
+        .uri       = "/ResetCam",
+        .method    = HTTP_GET,
+        .handler   = ResetCam_handler,
+        .user_ctx  = NULL
+    };
+
 
     httpd_uri_t index_uri = {
         .uri       = "/",
@@ -612,6 +622,8 @@ void startCameraServer(){
         httpd_register_uri_handler(camera_httpd, &TR_uri);
 
         httpd_register_uri_handler(camera_httpd, &readADC_uri);
+
+        httpd_register_uri_handler(camera_httpd, &ResetCam_uri);
     }
 
     //startStreamServer();
@@ -633,7 +645,7 @@ void startCameraServer(){
     config.server_port += 1;
     config.ctrl_port += 1;
     
-    Serial.printf("Starting stream server on port: '%d'", config.server_port);
+    Serial.printf("Starting stream server on port: '%d' '%d'", config.server_port, config.ctrl_port);
     if (httpd_start(&stream_httpd, &config) == ESP_OK) {
         httpd_register_uri_handler(stream_httpd, &stream_uri);
         httpd_register_uri_handler(stream_httpd, &capture_uri);

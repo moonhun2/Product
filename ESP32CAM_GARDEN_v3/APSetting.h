@@ -97,6 +97,8 @@ bool init_wifi()
   Serial.println(pref_ssid);
   Serial.println(pref_pass);
 
+  WiFi.mode(WIFI_STA);
+  
   WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE);
 
   long start_wifi_millis = millis();
@@ -121,7 +123,6 @@ bool init_wifi()
 
 void scan_wifi_networks()
 {
-  WiFi.mode(WIFI_STA);
   // WiFi.scanNetworks will return the number of networks found
   int n =  WiFi.scanNetworks();
   if (n == 0) {
@@ -400,4 +401,9 @@ bool APS_Alarm_On()
     handler_Alarm(PERIOD_ALARM_WIFI);
     delay(100);
   }
+}
+
+void APS_GetWiFiStatus()
+{
+  Serial.println(WiFi.status());
 }
