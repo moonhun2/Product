@@ -258,6 +258,7 @@ void APS_wait_for_BLE()
       
       if( bWiFi_connected)
       {
+        bluetooth_disconnect = true;  // 블루투스를 끊으라고 명령
         Serial.println("In progress SW_Reset. so pass this APS_wait_for_BLE");
         return;
       }

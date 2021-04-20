@@ -24,6 +24,8 @@
 
 #include "MotorDrvCtrl.h"
 
+String strError;              // frame gattering에서 문제 발생시 사용할 변수
+int nFPS = 0;
 
 extern String WiFiAddr;
 
@@ -128,79 +130,126 @@ static esp_err_t capture_handler(httpd_req_t *req){
 }
 
 static esp_err_t stream_handler(httpd_req_t *req){
-    camera_fb_t * fb = NULL;
-    esp_err_t res = ESP_OK;
-    size_t _jpg_buf_len = 0;
-    uint8_t * _jpg_buf = NULL;
-    char * part_buf[64];
+    
+  Serial.println("stream_handler started");
+  strError = "stream_started";
+  
+  camera_fb_t * fb = NULL;
+  esp_err_t res = ESP_OK;
+  size_t _jpg_buf_len = 0;
+  uint8_t * _jpg_buf = NULL;
+  char * part_buf[64];
 
-    static int64_t last_frame = 0;
-    if(!last_frame) {
-        last_frame = esp_timer_get_time();
-    }
+  static int64_t last_frame = 0;
+  if(!last_frame) {
+      last_frame = esp_timer_get_time();
+  }
 
-    res = httpd_resp_set_type(req, _STREAM_CONTENT_TYPE);
-    if(res != ESP_OK){
-        return res;
-    }
-
-    while(true){
-        fb = esp_camera_fb_get();
-        if (!fb) {
-            Serial.printf("Camera capture failed");
-            res = ESP_FAIL;
-        } else {
-            if(fb->format != PIXFORMAT_JPEG){
-                bool jpeg_converted = frame2jpg(fb, 80, &_jpg_buf, &_jpg_buf_len);
-                esp_camera_fb_return(fb);
-                fb = NULL;
-                if(!jpeg_converted){
-                    Serial.printf("JPEG compression failed");
-                    res = ESP_FAIL;
-                }
-            } else {
-                _jpg_buf_len = fb->len;
-                _jpg_buf = fb->buf;
-            }
-        }
-        if(res == ESP_OK){
-            size_t hlen = snprintf((char *)part_buf, 64, _STREAM_PART, _jpg_buf_len);
-            res = httpd_resp_send_chunk(req, (const char *)part_buf, hlen);
-        }
-        if(res == ESP_OK){
-            res = httpd_resp_send_chunk(req, (const char *)_jpg_buf, _jpg_buf_len);
-        }
-        if(res == ESP_OK){
-            res = httpd_resp_send_chunk(req, _STREAM_BOUNDARY, strlen(_STREAM_BOUNDARY));
-        }
-        if(fb){
-            esp_camera_fb_return(fb);
-            fb = NULL;
-            _jpg_buf = NULL;
-        } else if(_jpg_buf){
-            free(_jpg_buf);
-            _jpg_buf = NULL;
-        }
-        if(res != ESP_OK){
-            break;
-        }
-        int64_t fr_end = esp_timer_get_time();
-
-        int64_t frame_time = fr_end - last_frame;
-        last_frame = fr_end;
-        frame_time /= 1000;
-        uint32_t avg_frame_time = ra_filter_run(&ra_filter, frame_time);
-        Serial.printf("MJPG: %uB %ums (%.1ffps), AVG: %ums (%.1ffps)\n"
-            ,(uint32_t)(_jpg_buf_len),
-            (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time,
-            avg_frame_time, 1000.0 / avg_frame_time
-        );
-
-        delay(20);
-    }
-
-    last_frame = 0;
+  res = httpd_resp_set_type(req, _STREAM_CONTENT_TYPE);
+  if(res != ESP_OK){
+    strError = "httpd_resp_set_type failed";
     return res;
+  }
+
+  httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*"); //Added.
+  
+  while(true){
+      fb = esp_camera_fb_get();
+      if (!fb) {
+          Serial.printf("Camera capture failed");
+          res = ESP_FAIL;
+          strError = "Camera capture failed";
+      } else {
+          if(fb->format != PIXFORMAT_JPEG){
+              bool jpeg_converted = frame2jpg(fb, 80, &_jpg_buf, &_jpg_buf_len);
+              esp_camera_fb_return(fb);
+              fb = NULL;
+              if(!jpeg_converted){
+                  Serial.printf("JPEG compression failed");
+                  res = ESP_FAIL;
+                  strError = "JPEG compression failed";
+              }
+          } else {
+              _jpg_buf_len = fb->len;
+              _jpg_buf = fb->buf;
+          }
+      }
+
+      // Send header
+      if(res == ESP_OK)
+      {
+          size_t hlen = snprintf((char *)part_buf, 64, _STREAM_PART, _jpg_buf_len);
+          res = httpd_resp_send_chunk(req, (const char *)part_buf, hlen);
+
+          delay(5);
+          
+          if(res != ESP_OK)
+            strError = "Err to send Header " + String(hlen);
+      }
+      
+      // Send Data
+      if(res == ESP_OK)
+      {
+          res = httpd_resp_send_chunk(req, (const char *)_jpg_buf, _jpg_buf_len);
+
+          delay(5);
+
+          if(res == ESP_ERR_INVALID_ARG)
+            strError = "ESP_ERR_INVALID_ARG " + String(_jpg_buf_len);
+          else if(res == ESP_ERR_HTTPD_RESP_HDR)
+            strError = "ESP_ERR_HTTPD_RESP_HDR " + String(_jpg_buf_len);
+          else if(res == ESP_ERR_HTTPD_RESP_SEND)
+            strError = "ESP_ERR_HTTPD_RESP_SEND " + String(_jpg_buf_len);
+          else if(res == ESP_ERR_HTTPD_INVALID_REQ)
+            strError = "ESP_ERR_HTTPD_INVALID_REQ " + String(_jpg_buf_len);
+      }
+      
+      // Send Boundary
+      if(res == ESP_OK)
+      {
+          res = httpd_resp_send_chunk(req, _STREAM_BOUNDARY, strlen(_STREAM_BOUNDARY));
+
+          delay(5);
+          
+          if(res != ESP_OK)
+            strError = "Err to send boundry ";
+      }
+      
+      // free probe
+      if(fb){
+          esp_camera_fb_return(fb);
+          fb = NULL;
+          _jpg_buf = NULL;
+      } else if(_jpg_buf){
+          free(_jpg_buf);
+          _jpg_buf = NULL;
+      }
+      
+      if(res != ESP_OK){
+          break;
+      }
+      
+      int64_t fr_end = esp_timer_get_time();
+
+      int64_t frame_time = fr_end - last_frame;
+      last_frame = fr_end;
+      frame_time /= 1000;
+      uint32_t avg_frame_time = ra_filter_run(&ra_filter, frame_time);
+      nFPS = 1000.0 / avg_frame_time;
+
+      Serial.printf("MJPG: %uB %ums (%.1ffps), AVG: %ums (%.1ffps)\n"
+          ,(uint32_t)(_jpg_buf_len),
+          (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time,
+          avg_frame_time, (float)nFPS
+      );
+      
+  }
+
+  Serial.println("\nExit stream_handler");
+  
+  last_frame = 0;
+
+  return res;
 }
 /*
 static esp_err_t cmd_handler(httpd_req_t *req){
@@ -326,13 +375,25 @@ static esp_err_t index_handler(httpd_req_t *req){
       
       <script>
         var xhttp = new XMLHttpRequest();
-      </script>
       
-      <script>
-        function getsend(arg) { xhttp.open('GET', arg +'?' + new Date().getTime(), true); xhttp.send(); }
-      </script>
-    
-      <script>
+        function getsend(arg) { 
+          xhttp.open('GET', arg +'?' + new Date().getTime(), true); 
+          xhttp.send(); 
+        }
+
+          
+        function getInform() {    
+          xhttp.onreadystatechange = function() {      
+            if (this.readyState == 4 && this.status == 200) {  
+              if(this.responseText != "OK")
+                document.getElementById("ADCValue").innerHTML =        this.responseText;      
+            }    
+          };    
+          
+          xhttp.open("GET", "readADC", true);    xhttp.send();  
+        }
+
+      
         document.addEventListener('DOMContentLoaded', function (event) {
           var baseHost = document.location.origin;
           var streamUrl = baseHost + ':81';
@@ -415,7 +476,12 @@ static esp_err_t index_handler(httpd_req_t *req){
         <button style=background-color:yellow;width:140px;height:40px onmousedown=getsend('TL')><b>Trim Left</b></button>
         <button style=background-color:yellow;width:140px;height:40px onmousedown=getsend('TR')><b>Trim Right</b></button>
       </p>
-    
+
+      <br>
+        <button id='get_inform' style=width:140px;height:40px; onmousedown=getInform()>Information</button><br>
+        FrameRate : <span id="ADCValue">0</span><br>
+        <button style=width:140px;height:40px onmousedown=getsend('SW_Reset')><b>Reset camera</b></button>
+        
     </body>
   
   </html>
@@ -465,6 +531,19 @@ static esp_err_t TR_handler(httpd_req_t *req){
   MC_TrimCenter(nValue);
   Serial.println("TR");    httpd_resp_set_type(req, "text/html");    return httpd_resp_send(req, "OK", 2);   }
 
+static esp_err_t readADC_handler(httpd_req_t *req)
+{   
+  String strInfo = String(nFPS) + "FPS<br> State : "  + strError;
+  httpd_resp_set_type(req, "text/html");    return httpd_resp_send(req, &strInfo[0], strlen(&strInfo[0]));
+}
+
+static esp_err_t SWReset_handler(httpd_req_t *req)
+{   
+  preferences.putString("pref_reset", "SW_Reset");  // SW 리셋이 진행중임을 기록
+  Serial.println("\n\n restart ESP \n\n");
+  ESP.restart();
+}
+
 
 void startCameraServer(){
   // Initialize SPIFFS
@@ -504,6 +583,19 @@ void startCameraServer(){
     httpd_uri_t TL_uri   = {        .uri       = "/TL",         .method    = HTTP_GET,        .handler   = TL_handler,         .user_ctx  = NULL };
     httpd_uri_t TR_uri   = {        .uri       = "/TR",         .method    = HTTP_GET,        .handler   = TR_handler,         .user_ctx  = NULL };
 
+    httpd_uri_t readADC_uri = {
+        .uri       = "/readADC",
+        .method    = HTTP_GET,
+        .handler   = readADC_handler,
+        .user_ctx  = NULL
+    };
+
+    httpd_uri_t SWReset_uri = {
+        .uri       = "/SW_Reset",
+        .method    = HTTP_GET,
+        .handler   = SWReset_handler,
+        .user_ctx  = NULL
+    };
 
     httpd_uri_t index_uri = {
         .uri       = "/",
@@ -564,6 +656,9 @@ void startCameraServer(){
 
         httpd_register_uri_handler(camera_httpd, &TL_uri);
         httpd_register_uri_handler(camera_httpd, &TR_uri);
+
+        httpd_register_uri_handler(camera_httpd, &readADC_uri);
+        httpd_register_uri_handler(camera_httpd, &SWReset_uri);
     }
 
     config.server_port += 1;
