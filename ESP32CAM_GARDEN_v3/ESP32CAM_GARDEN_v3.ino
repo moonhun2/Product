@@ -71,6 +71,28 @@ IPAddress secondaryDNS(219,250,36,130); //optional
 #error "Camera model not selected"
 #endif
 
+
+
+/*
+ * typedef enum {
+    FRAMESIZE_QQVGA,    // 160x120
+    FRAMESIZE_QQVGA2,   // 128x160
+    FRAMESIZE_QCIF,     // 176x144
+    FRAMESIZE_HQVGA,    // 240x176
+    FRAMESIZE_QVGA,     // 320x240
+    FRAMESIZE_CIF,      // 400x296
+    FRAMESIZE_VGA,      // 640x480
+    FRAMESIZE_SVGA,     // 800x600
+    FRAMESIZE_XGA,      // 1024x768
+    FRAMESIZE_SXGA,     // 1280x1024
+    FRAMESIZE_UXGA,     // 1600x1200
+    FRAMESIZE_QXGA,     // 2048*1536
+    FRAMESIZE_INVALID
+} framesize_t;
+
+*/
+
+
 // use configuration
 extern Preferences preferences; // APSetting.h에 선언된 객체 사용
 
@@ -118,10 +140,11 @@ void setup() {
   config.pixel_format = PIXFORMAT_JPEG;
   //init with high specs to pre-allocate larger buffers
   if(psramFound()){
-    config.frame_size = FRAMESIZE_UXGA;
+    //config.frame_size = FRAMESIZE_UXGA;
+    config.frame_size = FRAMESIZE_VGA;
     config.jpeg_quality = 10;
-    config.fb_count = 2;
-    //config.fb_count = 3;
+    //config.fb_count = 2;
+    config.fb_count = 3;
     Serial.println("psram founded");
   } else {
     config.frame_size = FRAMESIZE_SVGA;
