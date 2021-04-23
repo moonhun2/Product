@@ -106,6 +106,38 @@ void MC_Init();
 void MC_SaveRegister(bool bWiFiUsing);
 void MC_Watered();
 
+
+/* 인터럽트 타이머 설정 관련 */
+
+// 하드웨어 타이머 생성
+hw_timer_t * timer = NULL;
+
+// triggering state 
+volatile boolean bTrigger = false;
+
+// timer handler
+void IRAM_ATTR onTimer(){
+  bTrigger = true;
+}
+
+// Make timer and enable it. 
+void SetTimerInterrupt(unsigned long ulMicroSecond){    
+  
+  /* 1 tick take 1/(80MHZ/80) = 1us so we set divider 80 and count up */
+  timer = timerBegin(0, 80, true);
+
+  /* Attach onTimer function to our timer */
+  timerAttachInterrupt(timer, &onTimer, true);
+
+  /* Set alarm to call onTimer function every second 1 tick is 1us
+  => 1 second is 1000000us */
+  /* Repeat the alarm (third parameter) */
+  timerAlarmWrite(timer, ulMicroSecond, true);
+
+  /* Start an alarm */
+  timerAlarmEnable(timer);
+}
+
 void setup() {
   
   Serial.begin(115200);
@@ -135,16 +167,16 @@ void setup() {
   config.pin_sscb_scl = SIOC_GPIO_NUM;
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
-  config.xclk_freq_hz = 20000000;
-  //config.xclk_freq_hz = 10000000;
+  //config.xclk_freq_hz = 20000000;
+  config.xclk_freq_hz = 10000000;
   config.pixel_format = PIXFORMAT_JPEG;
   //init with high specs to pre-allocate larger buffers
   if(psramFound()){
     //config.frame_size = FRAMESIZE_UXGA;
     config.frame_size = FRAMESIZE_VGA;
     config.jpeg_quality = 10;
-    //config.fb_count = 2;
-    config.fb_count = 3;
+    config.fb_count = 2;
+    //config.fb_count = 3;
     Serial.println("psram founded");
   } else {
     config.frame_size = FRAMESIZE_SVGA;
@@ -180,7 +212,12 @@ void setup() {
   Serial.println("' to connect");
 
   MC_SaveRegister(true);
+
+  SetTimerInterrupt(1000000);// 1초에 한번씩 타이머 인터럽트
 }
+
+
+
 
 unsigned long ulTimeReset = millis(); // 네트웍이 끊어지는 문제로 30분마다 리셋
 unsigned long ulTimeGetInfo = millis(); // 네트웍이 끊어지는 문제로 30분마다 리셋
@@ -191,19 +228,25 @@ unsigned long ulTimeGetInfo = millis(); // 네트웍이 끊어지는 문제로 3
 
 void loop() {
   
+  if(bTrigger)
+  {
+    //Serial.println("\n\n Timer interrupted. \n\n");
+    
+    if( (millis() - ulTimeReset) > TIME_RESET)
+    {
+      ulTimeReset = millis(); // 타이머 초기화
+      preferences.putString("pref_reset", "SW_Reset");  // SW 리셋이 진행중임을 기록
+      Serial.println("\n\n restart ESP \n\n");
+      ESP.restart();
+    }
   
-  if( (millis() - ulTimeReset) > TIME_RESET)
-  {
-    ulTimeReset = millis(); // 타이머 초기화
-    preferences.putString("pref_reset", "SW_Reset");  // SW 리셋이 진행중임을 기록
-    Serial.println("\n\n restart ESP \n\n");
-    ESP.restart();
-  }
+    if( (millis() - ulTimeGetInfo) > TIME_GET_WATER)
+    {
+      //APS_GetWiFiStatus();
+      ulTimeGetInfo = millis(); // 타이머 초기화
+      MC_Watered();
+    }
 
-  if( (millis() - ulTimeGetInfo) > TIME_GET_WATER)
-  {
-    //APS_GetWiFiStatus();
-    ulTimeGetInfo = millis(); // 타이머 초기화
-    MC_Watered();
+    bTrigger = !bTrigger;
   }
 }

@@ -82,6 +82,42 @@ void startCameraServer();
 
 void MC_Init();
 
+
+
+
+/* 인터럽트 타이머 설정 관련 */
+
+// 하드웨어 타이머 생성
+hw_timer_t * timer = NULL;
+
+// triggering state 
+volatile boolean bTrigger = false;
+
+// timer handler
+void IRAM_ATTR onTimer(){
+  bTrigger = true;
+}
+
+// Make timer and enable it. 
+void SetTimerInterrupt(unsigned long ulMicroSecond){    
+  
+  /* 1 tick take 1/(80MHZ/80) = 1us so we set divider 80 and count up */
+  timer = timerBegin(0, 80, true);
+
+  /* Attach onTimer function to our timer */
+  timerAttachInterrupt(timer, &onTimer, true);
+
+  /* Set alarm to call onTimer function every second 1 tick is 1us
+  => 1 second is 1000000us */
+  /* Repeat the alarm (third parameter) */
+  timerAlarmWrite(timer, ulMicroSecond, true);
+
+  /* Start an alarm */
+  timerAlarmEnable(timer);
+}
+
+
+
 void setup() {
   
   Serial.begin(115200);
@@ -110,12 +146,13 @@ void setup() {
   config.pin_sscb_scl = SIOC_GPIO_NUM;
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
-  config.xclk_freq_hz = 20000000;
-  //config.xclk_freq_hz = 10000000;
+  //config.xclk_freq_hz = 20000000;
+  config.xclk_freq_hz = 10000000;
   config.pixel_format = PIXFORMAT_JPEG;
   //init with high specs to pre-allocate larger buffers
   if(psramFound()){
-    config.frame_size = FRAMESIZE_UXGA;
+    //config.frame_size = FRAMESIZE_UXGA;
+    config.frame_size = FRAMESIZE_VGA;
     config.jpeg_quality = 10;
     config.fb_count = 2;
     //config.fb_count = 3;
@@ -135,26 +172,8 @@ void setup() {
   //drop down frame size for higher initial frame rate
   sensor_t * s = esp_camera_sensor_get();
   s->set_framesize(s, FRAMESIZE_CIF);
-/*
-  if(!WiFi.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS)) {
-      Serial.println("STA Failed to configure");
-  }
-  */ 
-  /*WiFi.begin(ssid, password);
 
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("");
-  Serial.println("WiFi connected");
 
-  
-  Serial.print("Camera Ready! Use 'http://");
-  Serial.print(WiFi.localIP());
-  WiFiAddr = WiFi.localIP().toString();
-  Serial.println("' to connect");
-*/
   Serial.println("Get into APS_init()");
   APS_init();   // AP setting 초기화
 
@@ -169,6 +188,8 @@ void setup() {
   Serial.print(WiFi.localIP());
   WiFiAddr = WiFi.localIP().toString();
   Serial.println("' to connect");
+
+  SetTimerInterrupt(1000000);// 1초에 한번씩 타이머 인터럽트
 }
 
 
@@ -177,15 +198,17 @@ unsigned long ulTimeReset = millis(); // 네트웍이 끊어지는 문제로 30�
 //#define TIME_RESET  30000           // 1000 * 60 * 60
 
 void loop() {
-  delay(1000);
-
-  unsigned long ulTimeCur = millis();
-  if( (millis() - ulTimeReset) > TIME_RESET)
+  if(bTrigger)
   {
-    ulTimeReset = millis(); // 타이머 초기화
-    preferences.putString("pref_reset", "SW_Reset");  // SW 리셋이 진행중임을 기록
-    Serial.println("\n\n restart ESP \n\n");
-    ESP.restart();
+
+    unsigned long ulTimeCur = millis();
+    if( (millis() - ulTimeReset) > TIME_RESET)
+    {
+      ulTimeReset = millis(); // 타이머 초기화
+      preferences.putString("pref_reset", "SW_Reset");  // SW 리셋이 진행중임을 기록
+      Serial.println("\n\n restart ESP \n\n");
+      ESP.restart();
+    }
+    bTrigger = !bTrigger;
   }
-  
 }
