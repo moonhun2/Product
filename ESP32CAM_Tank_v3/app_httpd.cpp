@@ -1,4 +1,4 @@
-#include <SPIFFS.h>
+//#include <SPIFFS.h>
 
 // Copyright 2015-2016 Espressif Systems (Shanghai) PTE LTD
 //
@@ -503,7 +503,7 @@ static esp_err_t RB_handler(httpd_req_t *req){   MC_Move(9);    Serial.println("
 
 static esp_err_t LIGHT_on_handler(httpd_req_t *req){    digitalWrite(PIN_LED, HIGH);    Serial.println("Light ON");    httpd_resp_set_type(req, "text/html");    return httpd_resp_send(req, "OK", 2);  }
 static esp_err_t LIGHT_off_handler(httpd_req_t *req){   digitalWrite(PIN_LED, LOW);     Serial.println("Light OFF");   httpd_resp_set_type(req, "text/html");    return httpd_resp_send(req, "OK", 2);  }
-
+/*
 static esp_err_t LFjpeg_handler(httpd_req_t *req){    
   Serial.println("LFjpeg");    
   File f = SPIFFS.open("/LF.jpg", "r");
@@ -516,7 +516,7 @@ static esp_err_t LFjpeg_handler(httpd_req_t *req){
 
   delete [] buf;
  }
-
+*/
 
 
 static esp_err_t TL_handler(httpd_req_t *req){   
@@ -546,11 +546,11 @@ static esp_err_t SWReset_handler(httpd_req_t *req)
 
 
 void startCameraServer(){
-  // Initialize SPIFFS
+  /*// Initialize SPIFFS
   if(!SPIFFS.begin(true)){
     Serial.println("An Error has occurred while mounting SPIFFS");
     return;
-  }
+  }*/
   
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.max_uri_handlers = 20;

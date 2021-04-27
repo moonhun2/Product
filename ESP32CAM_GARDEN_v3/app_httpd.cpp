@@ -437,6 +437,29 @@ static esp_err_t index_handler(httpd_req_t *req){
           }
       
         }) 
+
+
+
+        navigator.vibrate = navigator.vibrate || navigator.webkitVibrate || navigator.mozVibrate || navigator.msVibrate;
+        
+        function vibrate() {
+          if (navigator.vibrate) 
+            navigator.vibrate(20000); // 진동을 울리게 한다. 1000ms = 1초
+          else
+            alert("진동을 지원하지 않는 기종 입니다.");
+        }
+        
+        function vibratearray() {
+          if (navigator.vibrate) 
+            navigator.vibrate([100,30,100,30,100,200,200,30,200,30,200,200,100,30,100,30,100]);
+          else
+            alert("진동을 지원하지 않는 기종 입니다.");
+        }
+        
+        function stopAlarm() {
+          navigator.vibrate(0);
+        }
+
       </script>
     
     </head>
@@ -468,6 +491,10 @@ static esp_err_t index_handler(httpd_req_t *req){
       <button id='get_inform' style=width:140px;height:40px; onmousedown=getInform()>Information</button><br>
       Moisture : <span id="ADCValue">0</span><br>
       <button style=width:140px;height:40px; onmousedown=getsend('ResetCam')><b>ResetCam</b></button>
+
+      <button style=width:140px;height:40px; onmousedown=vibrate()><b>Alarm</b></button>
+      <button style=width:140px;height:40px; onmousedown=vibratearray()><b>SOS</b></button>
+      <button style=width:140px;height:40px; onmousedown=stopAlarm()><b>Stop alarm</b></button>
     </body>
   
   </html>

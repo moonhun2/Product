@@ -229,6 +229,9 @@ void APS_init()
   
   preferences.begin("wifi_access", false);
 
+  Serial.println("BT end when start of setting wifi");
+  BLE.end();  // 블루투스를 끄고 wifi 시작
+  
   if (!init_wifi()) { // Connect to Wi-Fi fails
     BLE.register_callback(callbackBT);
   } else {
